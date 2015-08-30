@@ -175,8 +175,11 @@ local function building_criteria_changed(l_bld, player)
 		local newstate = all_crit_fulfilled and rtstools.building_state.BUILT
 			or rtstools.building_state.BUILDING
 		if newstate ~= l_bld.state then
-			minetest.chat_send_player(player:get_player_name(), "State change for building '" .. l_bld.bld.name .. "' to " .. newstate)
+			local newstate_name = rtstools.building_state_names[newstate]
+			minetest.chat_send_player(player:get_player_name(), "State change for building '"
+				.. l_bld.bld.name .. "' to " .. newstate_name)
 			l_bld.state = newstate
+			meta:set_string("infotext", l_bld.bld.name .. " (" .. newstate_name .. ")")
 		end
 		fspec = fspec .. "label[1," .. tostring(yc*0.5 + 1) .. ";" .. minetest.formspec_escape(crit_str) .. "]"
 		yc = yc + 1
