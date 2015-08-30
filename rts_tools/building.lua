@@ -118,7 +118,7 @@ rtstools.crit_type = {
 rtstools.crit_helper = {}
 
 
--- TODO get the radius param somehod else...
+-- TODO get the radius param somehow else...
 function rtstools.crit_helper.make_node_number(nodename, count, radius)
 	return {
 		type = rtstools.crit_type.nodes,
@@ -141,6 +141,152 @@ function rtstools.crit_helper.make_node_number(nodename, count, radius)
 				cur_cnt .. "/" .. count
 		end,
 		description = "Place " .. count .. " of " .. nodename,
+	}
+end
+
+-- does a graph search
+-- traverse_func(pos, val, table_for_new_elements) returning new done nodes and new todo nodes
+local function do_graph_search(initial_table, traverse_func)
+	local todo_table = {}
+	local done_table = {}
+	for idx, val in pairs(initial_table) do
+		todo_table[idx] = val
+	end
+	while true do
+		local pos
+		for idx, val in pairs(todo_table) do
+			pos = val
+			break
+		end
+		if pos == nil then -- if the table was empty, the search has ended
+			return
+		end
+		local new_done, new_todo = traverse_func(pos, todo_table[pos])
+		for idx, val in pairs(new_todo) do
+			if done_table[idx] == nil then
+				todo_table[idx] = val
+			end
+		end
+		todo_table[pos] = nil
+		done_table[pos] = true
+		for idx, val in pairs(new_done) do
+			todo_table[idx] = nil
+			done_table[idx] = true
+		end
+	end
+end
+
+local function add_to_postable(tbl, pos)
+	tbl[minetest.hash_node_position(pos)] = pos
+end
+
+local function new_postbl_with_pos(pos)
+	local res = {}
+	add_to_postable(res, pos)
+	return res
+end
+
+-- door_num: the number of at least two high openings filled
+-- room_node_names: { air = {}, door = {}, wall = {}, roof = {}, floor = {} }
+-- TODO: doors and walls recognition (esp. doors are hard problem :p)
+function rtstools.crit_helper.make_room_basic(room_node_names, door_min, door_max, air_num, radius)
+	return {
+		type = rtstools.crit_type.nodes,
+		is_fulfilled = function(mgmt_pos)
+			local minp, maxp = get_edges_around_pos(mgmt_pos, radius)
+			local vmanip = minetest.get_voxel_manip(minp, maxp)
+			local air_cnt = 0
+			local door_cnt = 0
+
+			local floor_level = mgmt_pos.y + 1
+			-- starts the room's graph search with the pos above the management node
+			local init_tbl = new_postbl_with_pos({x = mgmt_pos.x, y = mgmt_pos.y + 1, z = mgmt_pos.z})
+			do_graph_search(init_tbl, function(pos, val)
+				local new_done = new_postbl_with_pos(pos)
+				local new_todo = {}
+
+				-- 1. check current column
+				local column_height = 0
+				local valid_floor = false
+				local valid_roof = false
+				local is_air = true
+				local curpos = {x = pos.x, y = pos.y, z = pos.z}
+				-- first go down by at maximum 2 to find the floor node
+				-- (simulating a walking player)
+				while is_air do
+					if curpos.y < minp.y or curpos.y < pos.y - 2 then
+						-- abort if curpos is outside of boundaries
+						return new_postbl_with_pos(pos), {}
+					end
+					local nd = vmanip:get_node_at(curpos)
+					-- print("v " .. nd.name)
+					is_air = false
+					if room_node_names.air[nd.name] then
+						curpos.y = curpos.y - 1
+						is_air = true
+					elseif room_node_names.floor[nd.name] then
+						valid_floor = true
+					elseif nd.name == "somerts:lumberjack_mgmt" then
+						-- TODO really find a better check
+						valid_floor = true
+					end
+				end
+				-- now go up, and count how many air nodes we find
+				is_air = true
+				add_to_postable(new_done, curpos)
+				local column_floor_y = curpos.y
+				curpos.y = curpos.y + 1
+				while is_air do
+					if curpos.y > maxp.y then
+						-- abort if column isn't inside [minp, maxp]
+						return new_postbl_with_pos(pos), {}
+					end
+					local nd = vmanip:get_node_at(curpos)
+					-- print("^ " .. nd.name)
+					add_to_postable(new_done, curpos) -- gets every node in the column, except the floor
+					is_air = false
+					if room_node_names.air[nd.name] then
+						column_height = column_height + 1
+						curpos.y = curpos.y + 1
+						is_air = true
+					elseif room_node_names.roof[nd.name] then
+						valid_roof = true
+					end
+				end
+
+				-- 2. abort if column is too small (0 or 1 nodes high)
+				if column_height < 2 then
+					return new_postbl_with_pos(pos), {}
+				end
+
+				-- 3. abort if column doesn't have matching floor or roof
+				if not valid_floor or not valid_roof then
+					return new_postbl_with_pos(pos), {}
+				end
+
+				-- 4. add the column's nodes, if its 2 high, right above the floor,
+				-- if its >= 3 high, one block higher too, to allow for stairs
+				local add_y = column_floor_y + 1
+				if column_height > 2 then
+					add_to_postable(new_todo, {x = pos.x + 1, y = add_y + 1, z = pos.z})
+					add_to_postable(new_todo, {x = pos.x - 1, y = add_y + 1, z = pos.z})
+					add_to_postable(new_todo, {x = pos.x, y = add_y + 1, z = pos.z + 1})
+					add_to_postable(new_todo, {x = pos.x, y = add_y + 1, z = pos.z - 1})
+				end
+				add_to_postable(new_todo, {x = pos.x + 1, y = add_y, z = pos.z})
+				add_to_postable(new_todo, {x = pos.x - 1, y = add_y, z = pos.z})
+				add_to_postable(new_todo, {x = pos.x, y = add_y, z = pos.z + 1})
+				add_to_postable(new_todo, {x = pos.x, y = add_y, z = pos.z - 1})
+				air_cnt = air_cnt + column_height
+				return new_done, new_todo
+			end)
+			return (air_cnt >= air_num), -- and (door_cnt >= door_min)
+				--and (door_cnt <= door_max), " air " ..
+				air_cnt .. "/" .. air_num
+				-- .. ", doors " .. door_min .. "/" .. door_max
+		end,
+		description = "Build house with at least " .. air_num .. " blocks of \n air around this node",
+		--"Build a room with at least " .. door_num .. " entrance(s) and at least " .. air_num .. " air",
 	}
 end
 
@@ -172,17 +318,17 @@ local function building_criteria_changed(l_bld, player)
 			crit_str = "UNKNOWN " .. crit.description
 			all_crit_fulfilled = false
 		end
-		local newstate = all_crit_fulfilled and rtstools.building_state.BUILT
-			or rtstools.building_state.BUILDING
-		if newstate ~= l_bld.state then
-			local newstate_name = rtstools.building_state_names[newstate]
-			minetest.chat_send_player(player:get_player_name(), "State change for building '"
-				.. l_bld.bld.name .. "' to " .. newstate_name)
-			l_bld.state = newstate
-			meta:set_string("infotext", l_bld.bld.name .. " (" .. newstate_name .. ")")
-		end
 		fspec = fspec .. "label[1," .. tostring(yc*0.5 + 1) .. ";" .. minetest.formspec_escape(crit_str) .. "]"
 		yc = yc + 1
+	end
+	local newstate = all_crit_fulfilled and rtstools.building_state.BUILT
+		or rtstools.building_state.BUILDING
+	if newstate ~= l_bld.state then
+		local newstate_name = rtstools.building_state_names[newstate]
+		minetest.chat_send_player(player:get_player_name(), "State change for building '"
+			.. l_bld.bld.name .. "' to " .. newstate_name)
+		l_bld.state = newstate
+		meta:set_string("infotext", l_bld.bld.name .. " (" .. newstate_name .. ")")
 	end
 	print(fspec)
 	meta:set_string("formspec", fspec)
@@ -234,7 +380,7 @@ building criterion
 {
 	type,
 	is_fulfilled = function(returning pair of bool for result and string for result string),
-	description = "", used in management node for display TODO
+	description = "", used in management node for display
 }
 ]]
 function rtstools.register_building(t_name, def)
