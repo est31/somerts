@@ -420,7 +420,7 @@ function rtstools.register_building(t_name, def)
 			end
 		end,
 		on_punch = function(pos, node, puncher)
-			def.area_display.spawn(pos)
+			def.area_display.spawn(pos, 10)
 		end,
 		-- on_place = function(itemstack, placer, pointed_thing)
 		-- end,

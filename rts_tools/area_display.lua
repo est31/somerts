@@ -9,15 +9,20 @@ local rtsp = ...
 -- copied from TenPlus1's WTFPL licensed "Protector" mod
 
 minetest.register_entity("rts_tools:area_display", {
+	initial_properties = {
+		lifetime = 10,
+	},
 	physical = false,
 	collisionbox = {0, 0, 0, 0, 0, 0},
 	visual = "wielditem",
 	visual_size = {x = 1.0 / 1.5, y = 1.0 / 1.5}, -- wielditem seems to be scaled to 1.5 times original node size
 	textures = {"rts_tools:area_display_helper_node_??"}, -- to be replaced later with actual node name
 	on_step = function(self, dtime)
-		self.timer = (self.timer or 0) + dtime
-		if self.timer > 10 then
-			self.object:remove()
+		if self.lifetime then
+			self.lifetime = self.lifetime - dtime
+			if self.lifetime < 0 then
+				self.object:remove()
+			end
 		end
 	end,
 })
@@ -66,11 +71,12 @@ function rtstools.register_area_display(radius)
 	})
 
 	local ret = {
-		spawn = function(pos)
+		spawn = function(pos, lifetime)
 			minetest.registered_entities["rts_tools:area_display"].textures =
 				{"rts_tools:area_display_helper_node_" .. radius}
 			local entity = minetest.add_entity(pos, "rts_tools:area_display")
 			assert(entity) -- ensure we could spawn the entity
+			entity:get_properties().lifetime = lifetime
 			return entity
 		end,
 	}
