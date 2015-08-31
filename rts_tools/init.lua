@@ -10,6 +10,7 @@ rtsp.buildings = {}
 local modpath = minetest.get_modpath(minetest.get_current_modname()) .. "/"
 local rtsp_dofile = function (name) assert(loadfile(modpath .. name))(rtsp) end
 
+rtsp_dofile("area_display.lua")
 rtsp_dofile("building.lua")
 
 --function rtstools.show_

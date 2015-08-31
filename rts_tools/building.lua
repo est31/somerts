@@ -366,7 +366,7 @@ building definition (! is required)
 	image = {}, -- the building's icon image. TODO
 	            -- Used at various places like building menu, the management node, etc
 	built_criteria = {}, -- criteria a building needs to fullfill in order to be complete TODO
-	radius = !, -- the building's size TODO
+	radius = !, -- the building's size
 	on_addnode = {}, -- called when a node gets added inside the building's radius
 	on_built = !, -- executed when a building meets the criteria TODO
 	on_destroyed = !, -- executed when a building doesnt meet the criteria anymore TODO
@@ -419,6 +419,9 @@ function rtstools.register_building(t_name, def)
 				def.on_mgmt_removed(pos, def)
 			end
 		end,
+		on_punch = function(pos, node, puncher)
+			def.area_display.spawn(pos)
+		end,
 		-- on_place = function(itemstack, placer, pointed_thing)
 		-- end,
 		-- can_dig = function(pos, player)
@@ -429,5 +432,8 @@ function rtstools.register_building(t_name, def)
 		mgmt_def[name] = val
 	end
 	minetest.register_node(mgmt_name, mgmt_def)
+
+	-- register the area display
+	def.area_display = rtstools.register_area_display(def.radius)
 
 end
