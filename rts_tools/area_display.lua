@@ -22,11 +22,20 @@ minetest.register_entity("rts_tools:area_display", {
 	on_activate = function(self, staticdata)
 		if staticdata ~= "" then
 			self.display_data = minetest.deserialize(staticdata)
+			self:update_radius()
 		end
 	end,
 
 	set_display_data = function(self, display_data)
 		self.display_data = display_data
+		self:update_radius()
+	end,
+
+	update_radius = function(self)
+		self.object:set_properties({
+			textures = { "rts_tools:area_display_helper_node_"
+				.. self.display_data.radius }
+		})
 	end,
 
 	on_step = function(self, dtime)
@@ -89,11 +98,9 @@ function rtstools.register_area_display(radius)
 
 	local ret = {
 		spawn = function(pos, lifetime)
-			minetest.registered_entities["rts_tools:area_display"].textures =
-				{"rts_tools:area_display_helper_node_" .. radius}
 			local entity = minetest.add_entity(pos, "rts_tools:area_display")
 			assert(entity) -- ensure we could spawn the entity
-			entity:get_luaentity():set_display_data({ lifetime = lifetime })
+			entity:get_luaentity():set_display_data({ lifetime = lifetime, radius = radius })
 			return entity
 		end,
 	}
