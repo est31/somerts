@@ -9,21 +9,38 @@ local rtsp = ...
 -- copied from TenPlus1's WTFPL licensed "Protector" mod
 
 minetest.register_entity("rts_tools:area_display", {
-	initial_properties = {
+	display_data = {
 		lifetime = 10,
 	},
+
 	physical = false,
 	collisionbox = {0, 0, 0, 0, 0, 0},
 	visual = "wielditem",
 	visual_size = {x = 1.0 / 1.5, y = 1.0 / 1.5}, -- wielditem seems to be scaled to 1.5 times original node size
 	textures = {"rts_tools:area_display_helper_node_??"}, -- to be replaced later with actual node name
+
+	on_activate = function(self, staticdata)
+		if staticdata ~= "" then
+			self.display_data = minetest.deserialize(staticdata)
+		end
+	end,
+
+	set_display_data = function(self, display_data)
+		self.display_data = display_data
+	end,
+
 	on_step = function(self, dtime)
-		if self.lifetime then
-			self.lifetime = self.lifetime - dtime
-			if self.lifetime < 0 then
+		local display_data = self.display_data
+		if display_data.lifetime then
+			display_data.lifetime = display_data.lifetime - dtime
+			if display_data.lifetime < 0 then
 				self.object:remove()
 			end
 		end
+	end,
+
+	get_staticdata = function(self)
+		return minetest.serialize(self.display_data)
 	end,
 })
 
@@ -76,7 +93,7 @@ function rtstools.register_area_display(radius)
 				{"rts_tools:area_display_helper_node_" .. radius}
 			local entity = minetest.add_entity(pos, "rts_tools:area_display")
 			assert(entity) -- ensure we could spawn the entity
-			entity:get_properties().lifetime = lifetime
+			entity:get_luaentity():set_display_data({ lifetime = lifetime })
 			return entity
 		end,
 	}
