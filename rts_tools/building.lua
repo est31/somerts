@@ -336,7 +336,6 @@ local function building_criteria_changed(l_bld, player)
 		l_bld.state = newstate
 		meta:set_string("infotext", l_bld.bld.name .. " (" .. newstate_name .. ")")
 	end
-	print(fspec)
 	meta:set_string("formspec", fspec)
 end
 
