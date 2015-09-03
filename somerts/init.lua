@@ -29,6 +29,7 @@ rtstools.register_building("somerts:lumberjack", {
 	name = "Lumberjack",
 	short_desc = "cuts down trees, plants new ones",
 	radius = 5,
+	room_node_names = simple_buildings_room_node_names,
 })
 
 minetest.register_craft({

@@ -116,50 +116,8 @@ function rtstools.get_building_at_pos(pos)
 end
 
 --------------------------------------------------------------
--- Building plans management
+-- Room search utilities
 --------------------------------------------------------------
-
--- maps building name to its plan
--- TODO: make this player wise
--- TODO: save this to file
--- TODO: implement :)
-local building_plans = rtsp.building_plans
-
---------------------------------------------------------------
--- Criteria helpers and management
---------------------------------------------------------------
-
--- a list of criteria types, every criterion type gets called differently
-rtstools.crit_type = {
-	nodes = 1, -- gets updated if nodes of the building change
-}
-
-rtstools.crit_helper = {}
-
-function rtstools.crit_helper.make_node_number(nodename, count)
-	return {
-		type = rtstools.crit_type.nodes,
-		is_fulfilled = function(mgmt_pos, bld)
-			local minp, maxp = get_edges_around_pos(mgmt_pos, bld.radius)
-			local vmanip = minetest.get_voxel_manip(minp, maxp)
-			local cur_cnt = 0
-			for x = minp.x, maxp.x do
-			for y = minp.y, maxp.y do
-			for z = minp.z, maxp.z do
-				local n = vmanip:get_node_at({x = x, y = y, z = z})
-				if n.name == nodename then
-					cur_cnt = cur_cnt + 1
-				end
-			end
-			end
-			end
-			return (cur_cnt >= count), --(cur_cnt >= count)
-				-- and count .. "/" .. count or
-				cur_cnt .. "/" .. count
-		end,
-		description = "Place " .. count .. " of " .. nodename,
-	}
-end
 
 -- does a graph search.
 -- traverse_func(pos, val, table_for_new_elements) returning new done nodes and new todo nodes
@@ -305,6 +263,138 @@ local function do_room_basic_graph_search(mgmt_pos, bld, room_node_names, minp, 
 	return building_nodes, air_cnt
 end
 
+
+--------------------------------------------------------------
+-- Building plans management
+--------------------------------------------------------------
+
+local rel_positions = {
+	{x =  1, y =  0, z =  0},
+	{x = -1, y =  0, z =  0},
+	{x =  0, y =  1, z =  0},
+	{x =  0, y = -1, z =  0},
+	{x =  0, y =  0, z =  1},
+	{x =  0, y =  0, z = -1},
+}
+
+-- maps building name to its plan
+-- TODO: make this player wise
+-- TODO: save this to file
+local building_plans = rtsp.building_plans
+
+function update_building_plans_if_needed(mgmt_pos, bld_def, player)
+	local plans_entry = building_plans[bld_def.t_name]
+	if plans_entry then
+		return
+	else
+		minetest.chat_send_player(player:get_player_name(), "Using building '"
+			.. bld_def.name .. "' for building plan")
+		local plan = {}
+
+		local minp, maxp = get_edges_around_pos(mgmt_pos, bld_def.radius)
+		local vmanip = minetest.get_voxel_manip(minp, maxp)
+
+		-- first get a list of nodes of the building
+		local building_nodes = do_room_basic_graph_search(mgmt_pos, bld_def,
+			bld_def.room_node_names, minp, maxp, vmanip)
+		plan.building_nodes = building_nodes
+		-- print(dump(building_nodes))
+
+		-- then find a path to build the building
+		local init_tbl = new_postbl_with_pos({x = mgmt_pos.x, y = mgmt_pos.y + 1, z = mgmt_pos.z})
+		local pathidx = 1
+		local path = {}
+
+		-- TODO find better search algorithm, right now we are impl. dependent O_o
+		do_graph_search(init_tbl, function(pos, val)
+			-- print("traversing " .. dump(pos))
+			local new_done = new_postbl_with_pos(pos)
+			local new_todo = {}
+
+			local node = vmanip:get_node_at(pos)
+			path[pathidx] = { pos = vector.subtract(pos, mgmt_pos), node = node }
+			pathidx = pathidx + 1
+
+			for rpi, rpos in pairs(rel_positions) do
+				local cpos = vector.add(pos, rpos)
+				local cpos_h = minetest.hash_node_position(cpos)
+				if building_nodes[cpos_h] then
+					new_todo[cpos_h] = cpos
+				end
+			end
+			return new_done, new_todo
+		end)
+		plan.path = path
+		-- print(dump(path))
+		building_plans[bld_def.t_name] = plan
+	end
+end
+
+minetest.register_abm({
+	-- TODO find a better way, make a group (not register tons of ABMs this is bad for speed)
+	nodenames = {"somerts:lumberjack_mgmt"},
+	interval = 1,
+	chance = 1,
+	action = function(mgmt_pos, node, active_object_count, active_object_count_wider)
+		local l_bld = rtstools.get_building_at_pos(mgmt_pos)
+		if l_bld.state == rtstools.building_state.BUILDING  then
+			local plan_entry = building_plans[l_bld.bld.t_name]
+			if plan_entry then
+				local next_state = l_bld.build_progress_state and (l_bld.build_progress_state + 1) or 1
+				l_bld.build_progress_state = next_state
+				local pathel = plan_entry.path[next_state]
+				if pathel then
+					if pathel.node.name ~= l_bld.bld.mgmt_name then
+						minetest.set_node(vector.add(pathel.pos, mgmt_pos), pathel.node)
+						-- print("placing '" .. pathel.node.name .. "' at " .. dump(vector.add(pathel.pos, mgmt_pos)))
+					end
+				else
+					print("error, reached invalid path element at " .. next_state .. "! possibly end (which shouldnt be reached)?")
+					l_bld.build_progress_state = l_bld.build_progress_state - 1
+				end
+			end
+		elseif l_bld.state == rtstools.building_state.BUILT then
+			l_bld.build_progress_state = nil
+		end
+	end,
+})
+
+--------------------------------------------------------------
+-- Criteria helpers and management
+--------------------------------------------------------------
+
+-- a list of criteria types, every criterion type gets called differently
+rtstools.crit_type = {
+	nodes = 1, -- gets updated if nodes of the building change
+}
+
+rtstools.crit_helper = {}
+
+function rtstools.crit_helper.make_node_number(nodename, count)
+	return {
+		type = rtstools.crit_type.nodes,
+		is_fulfilled = function(mgmt_pos, bld)
+			local minp, maxp = get_edges_around_pos(mgmt_pos, bld.radius)
+			local vmanip = minetest.get_voxel_manip(minp, maxp)
+			local cur_cnt = 0
+			for x = minp.x, maxp.x do
+			for y = minp.y, maxp.y do
+			for z = minp.z, maxp.z do
+				local n = vmanip:get_node_at({x = x, y = y, z = z})
+				if n.name == nodename then
+					cur_cnt = cur_cnt + 1
+				end
+			end
+			end
+			end
+			return (cur_cnt >= count), --(cur_cnt >= count)
+				-- and count .. "/" .. count or
+				cur_cnt .. "/" .. count
+		end,
+		description = "Place " .. count .. " of " .. nodename,
+	}
+end
+
 -- door_num: the number of at least two high openings filled
 -- room_node_names: { air = {}, door = {}, wall = {}, roof = {}, floor = {} }
 -- TODO: doors and walls recognition (esp. doors are hard problem :p)
@@ -365,6 +455,9 @@ local function building_criteria_changed(l_bld, player)
 		local newstate_name = rtstools.building_state_names[newstate]
 		minetest.chat_send_player(player:get_player_name(), "State change for building '"
 			.. l_bld.bld.name .. "' to " .. newstate_name)
+		if newstate == rtstools.building_state.BUILT then
+			update_building_plans_if_needed(l_bld.pos, l_bld.bld, player)
+		end
 		l_bld.state = newstate
 		meta:set_string("infotext", l_bld.bld.name .. " (" .. newstate_name .. ")")
 	end
@@ -404,6 +497,7 @@ building definition (! is required)
 	            -- Used at various places like building menu, the management node, etc
 	built_criteria = {}, -- criteria a building needs to fullfill in order to be complete TODO
 	radius = !, -- the building's size
+	room_node_names = !, -- the node names for the rooms, see do_room_basic_graph_search
 	on_addnode = {}, -- called when a node gets added inside the building's radius
 	on_built = !, -- executed when a building meets the criteria TODO
 	on_destroyed = !, -- executed when a building doesnt meet the criteria anymore TODO
