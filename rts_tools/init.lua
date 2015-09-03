@@ -6,6 +6,8 @@ rtstools = {}
 
 local rtsp = {}
 rtsp.buildings = {}
+rtsp.loaded_buildings = {}
+rtsp.building_plans = {}
 
 local modpath = minetest.get_modpath(minetest.get_current_modname()) .. "/"
 local rtsp_dofile = function (name) assert(loadfile(modpath .. name))(rtsp) end

@@ -42,7 +42,7 @@ end
 --------------------------------------------------------------
 
 local astore = AreaStore()
-local loaded_buildings = {}
+local loaded_buildings = rtsp.loaded_buildings
 
 local loaded_buildings_path = minetest.get_worldpath() .. "/rts_buildings.dat"
 
@@ -116,6 +116,16 @@ function rtstools.get_building_at_pos(pos)
 end
 
 --------------------------------------------------------------
+-- Building plans management
+--------------------------------------------------------------
+
+-- maps building name to its plan
+-- TODO: make this player wise
+-- TODO: save this to file
+-- TODO: implement :)
+local building_plans = rtsp.building_plans
+
+--------------------------------------------------------------
 -- Criteria helpers and management
 --------------------------------------------------------------
 
@@ -151,8 +161,9 @@ function rtstools.crit_helper.make_node_number(nodename, count)
 	}
 end
 
--- does a graph search
+-- does a graph search.
 -- traverse_func(pos, val, table_for_new_elements) returning new done nodes and new todo nodes
+-- returns table of visited nodes
 local function do_graph_search(initial_table, traverse_func)
 	local todo_table = {}
 	local done_table = {}
@@ -166,7 +177,7 @@ local function do_graph_search(initial_table, traverse_func)
 			break
 		end
 		if pos == nil then -- if the table was empty, the search has ended
-			return
+			break
 		end
 		local new_done, new_todo = traverse_func(pos, todo_table[pos])
 		for idx, val in pairs(new_todo) do
@@ -178,9 +189,10 @@ local function do_graph_search(initial_table, traverse_func)
 		done_table[pos] = true
 		for idx, val in pairs(new_done) do
 			todo_table[idx] = nil
-			done_table[idx] = true
+			done_table[idx] = val
 		end
 	end
+	return done_table
 end
 
 local function add_to_postable(tbl, pos)
@@ -191,6 +203,106 @@ local function new_postbl_with_pos(pos)
 	local res = {}
 	add_to_postable(res, pos)
 	return res
+end
+
+local function do_room_basic_graph_search(mgmt_pos, bld, room_node_names, minp, maxp, vmanip)
+	local air_cnt = 0
+
+	-- starts the room's graph search with
+	-- the nodes above and below the management node
+	local init_tbl = {}
+	add_to_postable(init_tbl, {x = mgmt_pos.x, y = mgmt_pos.y + 1, z = mgmt_pos.z})
+	add_to_postable(init_tbl, {x = mgmt_pos.x, y = mgmt_pos.y - 1, z = mgmt_pos.z})
+	local building_nodes = do_graph_search(init_tbl, function(pos, val)
+		local new_done = new_postbl_with_pos(pos)
+		local new_todo = {}
+
+		-- print("Column at " .. dump(pos))
+
+		-- 1. check current column
+		local column_height = 0
+		local valid_floor = false
+		local valid_roof = false
+		local is_air = true
+		local curpos = {x = pos.x, y = pos.y, z = pos.z}
+		-- first go down by at maximum 2 to find the floor node
+		-- (simulating a walking player)
+		while is_air do
+			if curpos.y < minp.y or curpos.y < pos.y - 2 then
+				-- abort if curpos is outside of boundaries
+				return new_postbl_with_pos(pos), {}
+			end
+			local nd = vmanip:get_node_at(curpos)
+			-- print("v " .. nd.name)
+			is_air = false
+			if room_node_names.air[nd.name] then
+				curpos.y = curpos.y - 1
+				is_air = true
+			elseif room_node_names.floor[nd.name] then
+				valid_floor = true
+			elseif nd.name == bld.mgmt_name then
+				-- the management node is a valid floor node as well
+				valid_floor = true
+			end
+		end
+		-- now go up, and count how many air nodes we find
+		is_air = true
+		add_to_postable(new_done, curpos)
+		local column_floor_y = curpos.y
+		curpos.y = curpos.y + 1
+		while is_air do
+			if curpos.y > maxp.y then
+				-- abort if column isn't inside [minp, maxp]
+				return new_postbl_with_pos(pos), {}
+			end
+			local nd = vmanip:get_node_at(curpos)
+			-- print("^ " .. nd.name)
+			add_to_postable(new_done, curpos) -- gets every node in the column, except the floor
+			is_air = false
+			if room_node_names.air[nd.name] then
+				column_height = column_height + 1
+				curpos.y = curpos.y + 1
+				is_air = true
+			elseif room_node_names.roof[nd.name] then
+				valid_roof = true
+			elseif nd.name == bld.mgmt_name then
+				-- the management node is a valid roof node as well
+				valid_roof = true
+			end
+		end
+
+		-- 2. abort if column is too small (0 or 1 nodes high)
+		if column_height < 2 then
+			-- print("column too small")
+			return new_postbl_with_pos(pos), {}
+		end
+
+		-- 3. abort if column doesn't have matching floor or roof
+		if not valid_floor or not valid_roof then
+			-- print((valid_floor and "" or "no floor ")
+			--	.. (valid_roof and "" or "no roof"))
+			return new_postbl_with_pos(pos), {}
+		end
+
+		-- 4. add the column's nodes, if its 2 high, right above the floor,
+		-- if its >= 3 high, one block higher too, to allow for stairs
+		local add_y = column_floor_y + 1
+		if column_height > 2 then
+			add_to_postable(new_todo, {x = pos.x + 1, y = add_y + 1, z = pos.z})
+			add_to_postable(new_todo, {x = pos.x - 1, y = add_y + 1, z = pos.z})
+			add_to_postable(new_todo, {x = pos.x, y = add_y + 1, z = pos.z + 1})
+			add_to_postable(new_todo, {x = pos.x, y = add_y + 1, z = pos.z - 1})
+		end
+		add_to_postable(new_todo, {x = pos.x + 1, y = add_y, z = pos.z})
+		add_to_postable(new_todo, {x = pos.x - 1, y = add_y, z = pos.z})
+		add_to_postable(new_todo, {x = pos.x, y = add_y, z = pos.z + 1})
+		add_to_postable(new_todo, {x = pos.x, y = add_y, z = pos.z - 1})
+
+		-- print("valid " .. column_height)
+		air_cnt = air_cnt + column_height
+		return new_done, new_todo
+	end)
+	return building_nodes, air_cnt
 end
 
 -- door_num: the number of at least two high openings filled
@@ -205,100 +317,8 @@ function rtstools.crit_helper.make_room_basic(room_node_names, door_min, door_ma
 			local air_cnt = 0
 			local door_cnt = 0
 
-			-- starts the room's graph search with
-			-- the nodes above and below the management node
-			local init_tbl = {}
-			add_to_postable(init_tbl, {x = mgmt_pos.x, y = mgmt_pos.y + 1, z = mgmt_pos.z})
-			add_to_postable(init_tbl, {x = mgmt_pos.x, y = mgmt_pos.y - 1, z = mgmt_pos.z})
-			do_graph_search(init_tbl, function(pos, val)
-				local new_done = new_postbl_with_pos(pos)
-				local new_todo = {}
+			local building_nodes, air_cnt = do_room_basic_graph_search(mgmt_pos, bld, room_node_names, minp, maxp, vmanip)
 
-				-- print("Column at " .. dump(pos))
-
-				-- 1. check current column
-				local column_height = 0
-				local valid_floor = false
-				local valid_roof = false
-				local is_air = true
-				local curpos = {x = pos.x, y = pos.y, z = pos.z}
-				-- first go down by at maximum 2 to find the floor node
-				-- (simulating a walking player)
-				while is_air do
-					if curpos.y < minp.y or curpos.y < pos.y - 2 then
-						-- abort if curpos is outside of boundaries
-						return new_postbl_with_pos(pos), {}
-					end
-					local nd = vmanip:get_node_at(curpos)
-					-- print("v " .. nd.name)
-					is_air = false
-					if room_node_names.air[nd.name] then
-						curpos.y = curpos.y - 1
-						is_air = true
-					elseif room_node_names.floor[nd.name] then
-						valid_floor = true
-					elseif nd.name == bld.mgmt_name then
-						-- the management node is a valid floor node as well
-						valid_floor = true
-					end
-				end
-				-- now go up, and count how many air nodes we find
-				is_air = true
-				add_to_postable(new_done, curpos)
-				local column_floor_y = curpos.y
-				curpos.y = curpos.y + 1
-				while is_air do
-					if curpos.y > maxp.y then
-						-- abort if column isn't inside [minp, maxp]
-						return new_postbl_with_pos(pos), {}
-					end
-					local nd = vmanip:get_node_at(curpos)
-					-- print("^ " .. nd.name)
-					add_to_postable(new_done, curpos) -- gets every node in the column, except the floor
-					is_air = false
-					if room_node_names.air[nd.name] then
-						column_height = column_height + 1
-						curpos.y = curpos.y + 1
-						is_air = true
-					elseif room_node_names.roof[nd.name] then
-						valid_roof = true
-					elseif nd.name == bld.mgmt_name then
-						-- the management node is a valid roof node as well
-						valid_roof = true
-					end
-				end
-
-				-- 2. abort if column is too small (0 or 1 nodes high)
-				if column_height < 2 then
-					-- print("column too small")
-					return new_postbl_with_pos(pos), {}
-				end
-
-				-- 3. abort if column doesn't have matching floor or roof
-				if not valid_floor or not valid_roof then
-					-- print((valid_floor and "" or "no floor ")
-					--	.. (valid_roof and "" or "no roof"))
-					return new_postbl_with_pos(pos), {}
-				end
-
-				-- 4. add the column's nodes, if its 2 high, right above the floor,
-				-- if its >= 3 high, one block higher too, to allow for stairs
-				local add_y = column_floor_y + 1
-				if column_height > 2 then
-					add_to_postable(new_todo, {x = pos.x + 1, y = add_y + 1, z = pos.z})
-					add_to_postable(new_todo, {x = pos.x - 1, y = add_y + 1, z = pos.z})
-					add_to_postable(new_todo, {x = pos.x, y = add_y + 1, z = pos.z + 1})
-					add_to_postable(new_todo, {x = pos.x, y = add_y + 1, z = pos.z - 1})
-				end
-				add_to_postable(new_todo, {x = pos.x + 1, y = add_y, z = pos.z})
-				add_to_postable(new_todo, {x = pos.x - 1, y = add_y, z = pos.z})
-				add_to_postable(new_todo, {x = pos.x, y = add_y, z = pos.z + 1})
-				add_to_postable(new_todo, {x = pos.x, y = add_y, z = pos.z - 1})
-
-				-- print("valid " .. column_height)
-				air_cnt = air_cnt + column_height
-				return new_done, new_todo
-			end)
 			return (air_cnt >= air_num), -- and (door_cnt >= door_min)
 				--and (door_cnt <= door_max), " air " ..
 				air_cnt .. "/" .. air_num
