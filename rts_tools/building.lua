@@ -233,8 +233,8 @@ function rtstools.crit_helper.make_room_basic(room_node_names, door_min, door_ma
 						is_air = true
 					elseif room_node_names.floor[nd.name] then
 						valid_floor = true
-					elseif nd.name == "somerts:lumberjack_mgmt" then
-						-- TODO really find a better check
+					elseif nd.name == bld.mgmt_name then
+						-- the management node is a valid floor node as well
 						valid_floor = true
 					end
 				end
@@ -399,6 +399,7 @@ function rtstools.register_building(t_name, def)
 
 	-- register the management node
 	local mgmt_name = t_name .. "_mgmt"
+	def.mgmt_name = mgmt_name
 	local mgmt_def = {
 		description = def.name .. " Management",
 		groups = { oddly_breakable_by_hand = 3 },
