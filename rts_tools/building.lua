@@ -445,6 +445,10 @@ function rtstools.register_building(t_name, def)
 				minetest.chat_send_player(pname, "Would overlap with other building")
 			end
 		end,
+
+		paramtype = "light", -- (pretty bad) fix for the area display being black
+		-- but the engine doesnt allow more
+
 		-- can_dig = function(pos, player)
 		-- end,
 	}
