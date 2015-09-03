@@ -205,11 +205,16 @@ function rtstools.crit_helper.make_room_basic(room_node_names, door_min, door_ma
 			local air_cnt = 0
 			local door_cnt = 0
 
-			-- starts the room's graph search with the pos above the management node
-			local init_tbl = new_postbl_with_pos({x = mgmt_pos.x, y = mgmt_pos.y + 1, z = mgmt_pos.z})
+			-- starts the room's graph search with
+			-- the nodes above and below the management node
+			local init_tbl = {}
+			add_to_postable(init_tbl, {x = mgmt_pos.x, y = mgmt_pos.y + 1, z = mgmt_pos.z})
+			add_to_postable(init_tbl, {x = mgmt_pos.x, y = mgmt_pos.y - 1, z = mgmt_pos.z})
 			do_graph_search(init_tbl, function(pos, val)
 				local new_done = new_postbl_with_pos(pos)
 				local new_todo = {}
+
+				-- print("Column at " .. dump(pos))
 
 				-- 1. check current column
 				local column_height = 0
@@ -257,16 +262,22 @@ function rtstools.crit_helper.make_room_basic(room_node_names, door_min, door_ma
 						is_air = true
 					elseif room_node_names.roof[nd.name] then
 						valid_roof = true
+					elseif nd.name == bld.mgmt_name then
+						-- the management node is a valid roof node as well
+						valid_roof = true
 					end
 				end
 
 				-- 2. abort if column is too small (0 or 1 nodes high)
 				if column_height < 2 then
+					-- print("column too small")
 					return new_postbl_with_pos(pos), {}
 				end
 
 				-- 3. abort if column doesn't have matching floor or roof
 				if not valid_floor or not valid_roof then
+					-- print((valid_floor and "" or "no floor ")
+					--	.. (valid_roof and "" or "no roof"))
 					return new_postbl_with_pos(pos), {}
 				end
 
@@ -283,6 +294,8 @@ function rtstools.crit_helper.make_room_basic(room_node_names, door_min, door_ma
 				add_to_postable(new_todo, {x = pos.x - 1, y = add_y, z = pos.z})
 				add_to_postable(new_todo, {x = pos.x, y = add_y, z = pos.z + 1})
 				add_to_postable(new_todo, {x = pos.x, y = add_y, z = pos.z - 1})
+
+				-- print("valid " .. column_height)
 				air_cnt = air_cnt + column_height
 				return new_done, new_todo
 			end)
