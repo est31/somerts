@@ -91,7 +91,7 @@ minetest.register_on_shutdown(save_buildings_to_file)
 
 -- returns nil if there is no building
 function rtstools.can_place_building_at_pos(pos, radius)
-	local minp, maxp = get_edges_around_pos(mgmt_pos, radius)
+	local minp, maxp = get_edges_around_pos(pos, radius)
 	for id, area in pairs(astore:get_areas_in_area(minp, maxp, true, false, false)) do
 		return false
 	end
@@ -422,8 +422,17 @@ function rtstools.register_building(t_name, def)
 		on_punch = function(pos, node, puncher)
 			def.area_display.spawn(pos, 10)
 		end,
-		-- on_place = function(itemstack, placer, pointed_thing)
-		-- end,
+		on_place = function(itemstack, placer, pointed_thing)
+			-- TODO: don't guess the pos that minetest.item_place choses for placing
+			-- the item, but use a method that gives the pos directly
+			local pos_to_place = pointed_thing.above
+			if rtstools.can_place_building_at_pos(pos_to_place, def.radius) then
+				minetest.item_place(itemstack, placer, pointed_thing)
+			else
+				local pname = placer:get_player_name()
+				minetest.chat_send_player(pname, "Would overlap with other building")
+			end
+		end,
 		-- can_dig = function(pos, player)
 		-- end,
 	}
