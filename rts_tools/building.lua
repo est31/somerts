@@ -300,7 +300,6 @@ function rtstools.crit_helper.make_room_basic(room_node_names, door_min, door_ma
 end
 
 local function update_nodes_criteria(mgmt_pos, crit_states, bld)
-	local radius = bld.radius
 	for crit_idx, crit in pairs(bld.built_criteria) do
 		if crit.type == rtstools.crit_type.nodes then
 			crit_states[crit_idx] = { crit.is_fulfilled(mgmt_pos) }
