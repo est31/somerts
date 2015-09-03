@@ -11,4 +11,8 @@ License for code: LGPL v2.1+
 
 ## Asset licenses
 
+# rts_tools
 protector_display.png: Copyright 2013 Zeg9 <dazeg9@gmail.com>, License WTFPL
+
+# somerts
+somerts_apple_tree_sapling.png: Copyright 2013, Tim Huppertz <mitroman@naturalnet.de>, License CC-BY-SA-3.0 Unported.
