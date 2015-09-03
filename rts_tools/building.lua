@@ -205,7 +205,6 @@ function rtstools.crit_helper.make_room_basic(room_node_names, door_min, door_ma
 			local air_cnt = 0
 			local door_cnt = 0
 
-			local floor_level = mgmt_pos.y + 1
 			-- starts the room's graph search with the pos above the management node
 			local init_tbl = new_postbl_with_pos({x = mgmt_pos.x, y = mgmt_pos.y + 1, z = mgmt_pos.z})
 			do_graph_search(init_tbl, function(pos, val)
