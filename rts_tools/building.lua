@@ -331,8 +331,7 @@ function update_building_plans_if_needed(mgmt_pos, bld_def, player)
 end
 
 minetest.register_abm({
-	-- TODO find a better way, make a group (not register tons of ABMs this is bad for speed)
-	nodenames = {"somerts:lumberjack_mgmt"},
+	nodenames = {"group:rts_tools_mgmt"},
 	interval = 1,
 	chance = 1,
 	action = function(mgmt_pos, node, active_object_count, active_object_count_wider)
@@ -527,7 +526,12 @@ function rtstools.register_building(t_name, def)
 	def.mgmt_name = mgmt_name
 	local mgmt_def = {
 		description = def.name .. " Management",
-		groups = { oddly_breakable_by_hand = 3 },
+		groups = {
+			oddly_breakable_by_hand = 3,
+
+			-- to allow group based abms, etc
+			rts_tools_mgmt = 1,
+			},
 		on_construct = function(pos)
 			local minp, maxp = get_edges_around_pos(pos, def.radius)
 			local id = astore:insert_area(minp, maxp, '')
