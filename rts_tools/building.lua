@@ -98,6 +98,15 @@ function rtstools.can_place_building_at_pos(pos, radius)
 	return true
 end
 
+function rtstools.get_buildings_overlapping_area(pos, radius)
+	local minp, maxp = get_edges_around_pos(pos, radius)
+	local ret = {}
+	for id in pairs(astore:get_areas_in_area(minp, maxp, true, false, false)) do
+		ret[id] = loaded_buildings[id]
+	end
+	return ret
+end
+
 -- returns nil if there is no building
 function rtstools.get_building_at_pos(pos)
 	for id, area in pairs(astore:get_areas_for_pos(pos)) do
@@ -429,6 +438,11 @@ function rtstools.register_building(t_name, def)
 			if rtstools.can_place_building_at_pos(pos_to_place, def.radius) then
 				minetest.item_place(itemstack, placer, pointed_thing)
 			else
+				for id, building in pairs(
+						rtstools.get_buildings_overlapping_area(pos_to_place,
+						def.radius)) do
+					building.bld.area_display.spawn(building.pos, 5)
+				end
 				local pname = placer:get_player_name()
 				minetest.chat_send_player(pname, "Would overlap with other building")
 			end
