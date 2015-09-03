@@ -23,8 +23,8 @@ rtstools.register_building("somerts:lumberjack", {
 		tiles = {"default_sandstone_brick.png^default_tool_stoneaxe.png"},
 	},
 	built_criteria = {
-		rtstools.crit_helper.make_node_number("default:wood", 30, 5),
-		rtstools.crit_helper.make_room_basic(simple_buildings_room_node_names, 1, 1, 18, 5),
+		rtstools.crit_helper.make_node_number("default:wood", 30),
+		rtstools.crit_helper.make_room_basic(simple_buildings_room_node_names, 1, 1, 18),
 	},
 	name = "Lumberjack",
 	short_desc = "cuts down trees, plants new ones",

@@ -126,13 +126,11 @@ rtstools.crit_type = {
 
 rtstools.crit_helper = {}
 
-
--- TODO get the radius param somehow else...
-function rtstools.crit_helper.make_node_number(nodename, count, radius)
+function rtstools.crit_helper.make_node_number(nodename, count)
 	return {
 		type = rtstools.crit_type.nodes,
-		is_fulfilled = function(mgmt_pos)
-			local minp, maxp = get_edges_around_pos(mgmt_pos, radius)
+		is_fulfilled = function(mgmt_pos, bld)
+			local minp, maxp = get_edges_around_pos(mgmt_pos, bld.radius)
 			local vmanip = minetest.get_voxel_manip(minp, maxp)
 			local cur_cnt = 0
 			for x = minp.x, maxp.x do
@@ -198,11 +196,11 @@ end
 -- door_num: the number of at least two high openings filled
 -- room_node_names: { air = {}, door = {}, wall = {}, roof = {}, floor = {} }
 -- TODO: doors and walls recognition (esp. doors are hard problem :p)
-function rtstools.crit_helper.make_room_basic(room_node_names, door_min, door_max, air_num, radius)
+function rtstools.crit_helper.make_room_basic(room_node_names, door_min, door_max, air_num)
 	return {
 		type = rtstools.crit_type.nodes,
-		is_fulfilled = function(mgmt_pos)
-			local minp, maxp = get_edges_around_pos(mgmt_pos, radius)
+		is_fulfilled = function(mgmt_pos, bld)
+			local minp, maxp = get_edges_around_pos(mgmt_pos, bld.radius)
 			local vmanip = minetest.get_voxel_manip(minp, maxp)
 			local air_cnt = 0
 			local door_cnt = 0
@@ -302,7 +300,7 @@ end
 local function update_nodes_criteria(mgmt_pos, crit_states, bld)
 	for crit_idx, crit in pairs(bld.built_criteria) do
 		if crit.type == rtstools.crit_type.nodes then
-			crit_states[crit_idx] = { crit.is_fulfilled(mgmt_pos) }
+			crit_states[crit_idx] = { crit.is_fulfilled(mgmt_pos, bld) }
 		end
 	end
 end
@@ -387,7 +385,7 @@ building definition (! is required)
 building criterion
 {
 	type,
-	is_fulfilled = function(returning pair of bool for result and string for result string),
+	is_fulfilled = function(mgmt_pos, building_def), returns pair of bool for result and string for result string
 	description = "", used in management node for display
 }
 ]]
