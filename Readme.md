@@ -1,6 +1,6 @@
-# Minetest_rts
+# SomeRTS
 
-Minetest_rts is the attempt to make an RTS in a voxel world.
+SomeRTS is the attempt to make an RTS in a voxel world.
 It is implemented as minetest subgame.
 
 # License
