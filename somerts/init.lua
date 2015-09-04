@@ -32,11 +32,32 @@ rtstools.register_building("somerts:lumberjack", {
 	room_node_names = simple_buildings_room_node_names,
 })
 
+rtstools.register_building("somerts:wood_area", {
+	mgmt_override = {
+		tiles = {"default_wood.png^somerts_apple_tree_sapling.png"},
+	},
+	built_criteria = {
+	},
+	name = "Wood area",
+	short_desc = "marker area for wood useage",
+	radius = 10,
+	room_node_names = simple_buildings_room_node_names,
+})
+
 minetest.register_craft({
 	output = "somerts:lumberjack_mgmt",
 	recipe = {
 		{"default:wood", "default:axe_stone", "default:cobble"},
 		{"", "default:wood", ""},
 		{"default:tree", "default:tree", "default:tree"},
+	},
+})
+
+minetest.register_craft({
+	output = "somerts:wood_area_mgmt",
+	recipe = {
+		{"default:wood", "", "default:wood"},
+		{"", "default:sapling", ""},
+		{"", "default:dirt", ""},
 	},
 })
