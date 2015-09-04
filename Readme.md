@@ -3,6 +3,8 @@
 SomeRTS is the attempt to make an RTS in a voxel world.
 It is implemented as minetest subgame.
 
+Note: The current state of this project is pre-alpha, nothing is playable yet.
+
 # License
 
 Copyright (c) 2015 est31 <MTest31@outlook.com>
