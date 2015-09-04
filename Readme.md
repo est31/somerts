@@ -1,7 +1,7 @@
 # SomeRTS
 
 SomeRTS is the attempt to make an RTS in a voxel world.
-It is implemented as minetest subgame.
+It is implemented as minetest modpack.
 
 Note: The current state of this project is pre-alpha, nothing is playable yet.
 
