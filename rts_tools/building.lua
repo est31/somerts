@@ -565,13 +565,17 @@ function rtstools.register_building(t_name, def)
 			if rtstools.can_place_building_at_pos(pos_to_place, def.radius) then
 				minetest.item_place(itemstack, placer, pointed_thing)
 			else
+				local cnt = 0
 				for id, building in pairs(
 						rtstools.get_buildings_overlapping_area(pos_to_place,
 						def.radius)) do
 					building.bld.area_display.spawn(building.pos, 5)
+					cnt = cnt + 1
 				end
 				local pname = placer:get_player_name()
-				minetest.chat_send_player(pname, "Would overlap with other building")
+				minetest.chat_send_player(pname,
+					(cnt > 1 and "Would overlap with other buildings"
+						or "Would overlap with another building"))
 			end
 		end,
 
