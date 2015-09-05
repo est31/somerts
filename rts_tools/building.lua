@@ -27,10 +27,12 @@ end
 rtstools.building_state = {
 	BUILDING = 1,
 	BUILT = 2,
+	BUILDING_STALE = 3,
 }
 rtstools.building_state_names = {
 	"building",
 	"built",
+	"building, stale",
 }
 
 local function building_built()
@@ -349,6 +351,7 @@ minetest.register_abm({
 					end
 				else
 					print("error, reached invalid path element at " .. next_state .. "! possibly end (which shouldnt be reached)?")
+					l_bld.state = BUILDING_STALE
 					l_bld.build_progress_state = l_bld.build_progress_state - 1
 				end
 			end
