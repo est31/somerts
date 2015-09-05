@@ -122,7 +122,7 @@ end
 --------------------------------------------------------------
 
 -- does a graph search.
--- traverse_func(pos, val, table_for_new_elements) returning new done nodes and new todo nodes
+-- traverse_func(val) returning new done nodes and new todo nodes
 -- returns table of visited nodes
 local function do_graph_search(initial_table, traverse_func)
 	local todo_table = {}
@@ -131,22 +131,24 @@ local function do_graph_search(initial_table, traverse_func)
 		todo_table[idx] = val
 	end
 	while true do
-		local pos
+		local cur_entry
+		local cur_idx
 		for idx, val in pairs(todo_table) do
-			pos = val
+			cur_entry = val
+			cur_idx = idx
 			break
 		end
-		if pos == nil then -- if the table was empty, the search has ended
+		if cur_entry == nil then -- if the table was empty, the search has ended
 			break
 		end
-		local new_done, new_todo = traverse_func(pos, todo_table[pos])
+		local new_done, new_todo = traverse_func(cur_entry)
 		for idx, val in pairs(new_todo) do
 			if done_table[idx] == nil then
 				todo_table[idx] = val
 			end
 		end
-		todo_table[pos] = nil
-		done_table[pos] = true
+		todo_table[cur_idx] = nil
+		done_table[cur_idx] = true
 		for idx, val in pairs(new_done) do
 			todo_table[idx] = nil
 			done_table[idx] = val
@@ -157,6 +159,12 @@ end
 
 local function add_to_postable(tbl, pos)
 	tbl[minetest.hash_node_position(pos)] = pos
+end
+
+local function add_to_done_postable(tbl, pos)
+	tbl[minetest.hash_node_position(pos)] = {
+		pos = pos,
+	}
 end
 
 local function new_postbl_with_pos(pos)
@@ -173,7 +181,7 @@ local function do_room_basic_graph_search(mgmt_pos, bld, room_node_names, minp, 
 	local init_tbl = {}
 	add_to_postable(init_tbl, {x = mgmt_pos.x, y = mgmt_pos.y + 1, z = mgmt_pos.z})
 	add_to_postable(init_tbl, {x = mgmt_pos.x, y = mgmt_pos.y - 1, z = mgmt_pos.z})
-	local building_nodes = do_graph_search(init_tbl, function(pos, val)
+	local building_nodes = do_graph_search(init_tbl, function(pos)
 		local new_done = new_postbl_with_pos(pos)
 		local new_todo = {}
 
@@ -207,7 +215,7 @@ local function do_room_basic_graph_search(mgmt_pos, bld, room_node_names, minp, 
 		end
 		-- now go up, and count how many air nodes we find
 		is_air = true
-		add_to_postable(new_done, curpos)
+		add_to_done_postable(new_done, curpos)
 		local column_floor_y = curpos.y
 		curpos.y = curpos.y + 1
 		while is_air do
@@ -217,7 +225,7 @@ local function do_room_basic_graph_search(mgmt_pos, bld, room_node_names, minp, 
 			end
 			local nd = vmanip:get_node_at(curpos)
 			-- print("^ " .. nd.name)
-			add_to_postable(new_done, curpos) -- gets every node in the column, except the floor
+			add_to_done_postable(new_done, curpos) -- gets every node in the column, except the floor
 			is_air = false
 			if room_node_names.air[nd.name] then
 				column_height = column_height + 1
