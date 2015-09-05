@@ -433,6 +433,7 @@ local function building_criteria_changed(l_bld, player)
 	local meta = minetest.get_meta(l_bld.pos)
 	local fspec = "size[8,9]label[0.5,0.5;"
 		.. minetest.formspec_escape("Management node for " .. l_bld.bld.name) .. "]"
+		.. "image[0,1;1,1;" .. l_bld.bld.image .. "]"
 	local yc = 0
 	local all_crit_fulfilled = true
 	for crit_id, crit in pairs(l_bld.bld.built_criteria) do
@@ -495,7 +496,7 @@ building definition (! is required)
 	t_name, -- the technical name, set by register_building, you don't have to care setting it :)
 	name = !, -- a name for the building, stay below 20 chars :) TODO
 	short_desc = ! -- a short description of the building, stay below 50 chars ;p TODO
-	image = {}, -- the building's icon image. TODO
+	image = !, -- the building's icon image.
 	            -- Used at various places like building menu, the management node, etc
 	built_criteria = {}, -- criteria a building needs to fullfill in order to be complete TODO
 	radius = !, -- the building's size
