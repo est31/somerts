@@ -158,12 +158,12 @@ local function do_graph_search(initial_table, traverse_func)
 end
 
 local function add_to_postable(tbl, pos)
-	tbl[minetest.hash_node_position(pos)] = pos
+	tbl[minetest.hash_node_position(pos)] = table.copy(pos)
 end
 
 local function add_to_d_postable(tbl, pos, d)
 	tbl[minetest.hash_node_position(pos)] = {
-		pos = pos,
+		pos = table.copy(pos),
 		d = d,
 	}
 end
