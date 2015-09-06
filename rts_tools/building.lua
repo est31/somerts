@@ -297,7 +297,6 @@ local function do_room_basic_graph_search(mgmt_pos, bld, room_node_names, minp, 
 		local new_done = new_d_postbl_with_pos(pos, b_r_search_class.NOWALL)
 		local new_todo = {}
 
-		-- print("Wall candidate at " .. dump(pos))
 
 		-- 1. Check if it is a wall candidate
 		if pos_entry.d ~= b_r_search_class.ISITWALL
@@ -313,6 +312,8 @@ local function do_room_basic_graph_search(mgmt_pos, bld, room_node_names, minp, 
 		if not room_node_names.wall[nd.name] then
 			return new_done, {}
 		end
+
+		-- print("Wall candidate at " .. dump(pos))
 
 		-- 4. Now add whole y column thats a wall as well too
 
@@ -332,11 +333,13 @@ local function do_room_basic_graph_search(mgmt_pos, bld, room_node_names, minp, 
 			-- print("v " .. nd.name)
 			is_wall = false
 			if room_node_names.wall[nd.name] then
-				curpos.y = curpos.y - 1
 				is_wall = true
 			elseif nd.name == bld.mgmt_name then
 				-- the management node is a valid wall node as well
 				is_wall = true
+			end
+			if is_wall then
+				curpos.y = curpos.y - 1
 			end
 		end
 		-- now go up
@@ -348,10 +351,9 @@ local function do_room_basic_graph_search(mgmt_pos, bld, room_node_names, minp, 
 				return new_d_postbl_with_pos(pos, b_r_search_class.OUTSIDE), {}
 			end
 			local nd = vmanip:get_node_at(curpos)
-			-- print("v " .. nd.name)
+			-- print("^ " .. nd.name)
 			is_wall = false
 			if room_node_names.wall[nd.name] then
-				curpos.y = curpos.y - 1
 				is_wall = true
 			elseif nd.name == bld.mgmt_name then
 				-- the management node is a valid wall node as well
@@ -360,6 +362,7 @@ local function do_room_basic_graph_search(mgmt_pos, bld, room_node_names, minp, 
 			if is_wall then -- gets everything, floor included
 				add_to_d_postable(new_done, curpos,
 					b_r_search_class.WALL)
+				curpos.y = curpos.y + 1
 			end
 		end
 
@@ -382,6 +385,7 @@ local function do_room_basic_graph_search(mgmt_pos, bld, room_node_names, minp, 
 	-- incorporate building_wall_nodes and building_room_nodes into building_nodes, with the room nodes
 	-- overriding
 	local building_nodes = {}
+
 	for idx, val in pairs(building_wall_nodes) do
 		if val.d == b_r_search_class.WALL then
 			building_nodes[idx] = val
