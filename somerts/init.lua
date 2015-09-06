@@ -9,6 +9,7 @@ local simple_buildings_room_node_names = {
 	door = {}, -- TODO
 	wall = {
 		["default:wood"] = true,
+		["default:tree"] = true,
 	},
 	roof = {
 		["default:wood"] = true,
