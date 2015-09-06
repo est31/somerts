@@ -462,6 +462,8 @@ function update_building_plans_if_needed(mgmt_pos, bld_def, player)
 	end
 end
 
+local building_display = rtstools.register_area_display(0)
+
 minetest.register_abm({
 	nodenames = {"group:rts_tools_mgmt"},
 	interval = 1,
@@ -476,7 +478,9 @@ minetest.register_abm({
 				local pathel = plan_entry.path[next_state]
 				if pathel then
 					if pathel.node.name ~= l_bld.bld.mgmt_name then
-						minetest.set_node(vector.add(pathel.pos, mgmt_pos), pathel.node)
+						local setp = vector.add(pathel.pos, mgmt_pos)
+						minetest.set_node(setp, pathel.node)
+						building_display.spawn(setp, 2)
 						-- print("placing '" .. pathel.node.name .. "' at " .. dump(vector.add(pathel.pos, mgmt_pos)))
 					end
 				else
