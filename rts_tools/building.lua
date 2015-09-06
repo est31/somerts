@@ -4,6 +4,8 @@
 
 local rtsp = ...
 
+local rtsb = {}
+
 --------------------------------------------------------------
 -- Local helper functions
 --------------------------------------------------------------
@@ -418,12 +420,18 @@ local rel_positions = {
 -- TODO: save this to file
 local building_plans = rtsp.building_plans
 
-function update_building_plans_if_needed(mgmt_pos, bld_def, player)
+local function chat_send_player(player_name_or_nil, msg)
+	if player_name_or_nil then
+		chat_send_player(player_name_or_il, msg)
+	end
+end
+
+function update_building_plans_if_needed(mgmt_pos, bld_def, player_name)
 	local plans_entry = building_plans[bld_def.t_name]
 	if plans_entry then
 		return
 	else
-		minetest.chat_send_player(player:get_player_name(), "Using building '"
+		chat_send_player(player_name, "Using building '"
 			.. bld_def.name .. "' for building plan")
 		local plan = {}
 
@@ -486,6 +494,9 @@ minetest.register_abm({
 						minetest.set_node(setp, pathel.node)
 						building_display.spawn(setp, 2)
 						-- print("placing '" .. pathel.node.name .. "' at " .. dump(vector.add(pathel.pos, mgmt_pos)))
+
+						-- tell building logic of the added node
+						rtsb.update_building_state(l_bld, l_bld.owner_name)
 					end
 				else
 					print("error, reached invalid path element at " .. next_state .. "! possibly end (which shouldnt be reached)?")
@@ -567,7 +578,7 @@ local function update_nodes_criteria(mgmt_pos, crit_states, bld)
 	end
 end
 
-local function building_criteria_changed(l_bld, player)
+local function building_criteria_changed(l_bld, player_name)
 	local meta = minetest.get_meta(l_bld.pos)
 	local fspec = "size[8,9]label[0.5,0.5;"
 		.. minetest.formspec_escape("Management node for " .. l_bld.bld.name) .. "]"
@@ -594,10 +605,10 @@ local function building_criteria_changed(l_bld, player)
 		or rtstools.building_state.BUILDING
 	if newstate ~= l_bld.state then
 		local newstate_name = rtstools.building_state_names[newstate]
-		minetest.chat_send_player(player:get_player_name(), "State change for building '"
+		chat_send_player(player_name, "State change for building '"
 			.. l_bld.bld.name .. "' to " .. newstate_name)
 		if newstate == rtstools.building_state.BUILT then
-			update_building_plans_if_needed(l_bld.pos, l_bld.bld, player)
+			update_building_plans_if_needed(l_bld.pos, l_bld.bld, player_name)
 		end
 		l_bld.state = newstate
 		meta:set_string("infotext", l_bld.bld.name .. " (" .. newstate_name .. ")")
@@ -605,20 +616,23 @@ local function building_criteria_changed(l_bld, player)
 	meta:set_string("formspec", fspec)
 end
 
+function rtsb.update_building_state(l_bld, player_name)
+	update_nodes_criteria(l_bld.pos, l_bld.crit_states, l_bld.bld)
+	building_criteria_changed(l_bld, player_name)
+end
+
 minetest.register_on_placenode(function(pos, newnode, placer, oldnode, itemstack,
 		pointed_thing)
-	local bld = rtstools.get_building_at_pos(pos)
-	if bld then
-		update_nodes_criteria(bld.pos, bld.crit_states, bld.bld)
-		building_criteria_changed(bld, placer)
+	local l_bld = rtstools.get_building_at_pos(pos)
+	if l_bld then
+		rtsb.update_building_state(l_bld, placer:get_player_name())
 	end
 end)
 
 minetest.register_on_dignode(function(pos, oldnode, digger)
-	local bld = rtstools.get_building_at_pos(pos)
-	if bld then
-		update_nodes_criteria(bld.pos, bld.crit_states, bld.bld)
-		building_criteria_changed(bld, digger)
+	local l_bld = rtstools.get_building_at_pos(pos)
+	if l_bld then
+		rtsb.update_building_state(l_bld, digger:get_player_name())
 	end
 end)
 
@@ -683,6 +697,7 @@ function rtstools.register_building(t_name, def)
 				crit_states = {},
 				state = rtstools.building_state.BUILDING,
 				bld = def,
+				owner_name = nil, -- TODO we need to set the owner name here somehow
 			}
 		end,
 		on_destruct = function(pos)
