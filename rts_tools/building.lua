@@ -481,7 +481,7 @@ minetest.register_abm({
 					end
 				else
 					print("error, reached invalid path element at " .. next_state .. "! possibly end (which shouldnt be reached)?")
-					l_bld.state = BUILDING_STALE
+					l_bld.state = rtstools.building_state.BUILDING_STALE
 					l_bld.build_progress_state = l_bld.build_progress_state - 1
 				end
 			end
