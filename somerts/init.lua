@@ -32,7 +32,7 @@ rtstools.register_building("somerts:lumberjack", {
 	name = "Lumberjack",
 	short_desc = "cuts down trees, plants new ones",
 	image = "default_tool_stoneaxe.png",
-	radius = 5,
+	boxdef = 5,
 	room_node_names = simple_buildings_room_node_names,
 })
 
@@ -45,7 +45,7 @@ rtstools.register_building("somerts:wood_area", {
 	name = "Wood area",
 	short_desc = "marker area for wood useage",
 	image = "somerts_apple_tree_sapling.png",
-	radius = 10,
+	boxdef = 10,
 	room_node_names = simple_buildings_room_node_names,
 })
 

@@ -62,7 +62,7 @@ local function load_buildings_from_file()
 		loaded_buildings = {}
 		for bid, building in pairs(minetest.deserialize(b)) do
 			local def = rtsp.buildings[building.bld]
-			local minp, maxp = get_edges_around_pos(building.pos, def.radius)
+			local minp, maxp = get_edges_around_pos(building.pos, def.boxdef)
 			local id = astore:insert_area(minp, maxp, '')
 			assert(id)
 			loaded_buildings[id] = {
@@ -99,16 +99,16 @@ minetest.register_on_shutdown(save_buildings_to_file)
 -- TODO save them in regular intervals too, to not have problems when mt crashes
 
 -- returns nil if there is no building
-function rtstools.can_place_building_at_pos(pos, radius)
-	local minp, maxp = get_edges_around_pos(pos, radius)
+function rtstools.can_place_building_at_pos(pos, boxdef)
+	local minp, maxp = get_edges_around_pos(pos, boxdef)
 	for id, area in pairs(astore:get_areas_in_area(minp, maxp, true, false, false)) do
 		return false
 	end
 	return true
 end
 
-function rtstools.get_buildings_overlapping_area(pos, radius)
-	local minp, maxp = get_edges_around_pos(pos, radius)
+function rtstools.get_buildings_overlapping_area(pos, boxdef)
+	local minp, maxp = get_edges_around_pos(pos, boxdef)
 	local ret = {}
 	for id in pairs(astore:get_areas_in_area(minp, maxp, true, false, false)) do
 		ret[id] = loaded_buildings[id]
@@ -440,7 +440,7 @@ function update_building_plans_if_needed(mgmt_pos, bld_def, player_name)
 			.. bld_def.name .. "' for building plan")
 		local plan = {}
 
-		local minp, maxp = get_edges_around_pos(mgmt_pos, bld_def.radius)
+		local minp, maxp = get_edges_around_pos(mgmt_pos, bld_def.boxdef)
 		local vmanip = minetest.get_voxel_manip(minp, maxp)
 
 		-- first get a list of nodes of the building
@@ -530,7 +530,7 @@ function rtstools.crit_helper.make_node_number(nodename, count)
 	return {
 		type = rtstools.crit_type.nodes,
 		is_fulfilled = function(mgmt_pos, bld)
-			local minp, maxp = get_edges_around_pos(mgmt_pos, bld.radius)
+			local minp, maxp = get_edges_around_pos(mgmt_pos, bld.boxdef)
 			local vmanip = minetest.get_voxel_manip(minp, maxp)
 			local cur_cnt = 0
 			for x = minp.x, maxp.x do
@@ -558,7 +558,7 @@ function rtstools.crit_helper.make_room_basic(room_node_names, door_min, door_ma
 	return {
 		type = rtstools.crit_type.nodes,
 		is_fulfilled = function(mgmt_pos, bld)
-			local minp, maxp = get_edges_around_pos(mgmt_pos, bld.radius)
+			local minp, maxp = get_edges_around_pos(mgmt_pos, bld.boxdef)
 			local vmanip = minetest.get_voxel_manip(minp, maxp)
 			local air_cnt = 0
 			local door_cnt = 0
@@ -656,9 +656,10 @@ building definition (! is required)
 	image = !, -- the building's icon image.
 	            -- Used at various places like building menu, the management node, etc
 	built_criteria = {}, -- criteria a building needs to fullfill in order to be complete TODO
-	radius = !, -- the building's size
+	boxdef = !, -- the building's claimed area, where only the building itself can exist.
+	            -- either a table with two edges {min, max}, or a number specifying the cube's radius
 	room_node_names = !, -- the node names for the rooms, see do_room_basic_graph_search
-	on_addnode = {}, -- called when a node gets added inside the building's radius
+	on_addnode = {}, -- called when a node gets added inside the building's boxdef
 	on_built = !, -- executed when a building meets the criteria TODO
 	on_destroyed = !, -- executed when a building doesnt meet the criteria anymore TODO
 	on_mgmt_removed = {}, -- executed when the management node gets removed
@@ -694,7 +695,7 @@ function rtstools.register_building(t_name, def)
 			rts_tools_mgmt = 1,
 			},
 		on_construct = function(pos)
-			local minp, maxp = get_edges_around_pos(pos, def.radius)
+			local minp, maxp = get_edges_around_pos(pos, def.boxdef)
 			local id = astore:insert_area(minp, maxp, '')
 			assert(id)
 			loaded_buildings[id] = {
@@ -724,13 +725,13 @@ function rtstools.register_building(t_name, def)
 			-- TODO: don't guess the pos that minetest.item_place choses for placing
 			-- the item, but use a method that gives the pos directly
 			local pos_to_place = pointed_thing.above
-			if rtstools.can_place_building_at_pos(pos_to_place, def.radius) then
+			if rtstools.can_place_building_at_pos(pos_to_place, def.boxdef) then
 				minetest.item_place(itemstack, placer, pointed_thing)
 			else
 				local cnt = 0
 				for id, building in pairs(
 						rtstools.get_buildings_overlapping_area(pos_to_place,
-						def.radius)) do
+						def.boxdef)) do
 					building.bld.area_display.spawn(building.pos, 5)
 					cnt = cnt + 1
 				end
@@ -754,6 +755,6 @@ function rtstools.register_building(t_name, def)
 	minetest.register_node(mgmt_name, mgmt_def)
 
 	-- register the area display
-	def.area_display = rtstools.register_area_display(def.radius)
+	def.area_display = rtstools.register_area_display(def.boxdef)
 
 end
