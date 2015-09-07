@@ -34,7 +34,7 @@ minetest.register_entity("rts_tools:area_display", {
 	update_radius = function(self)
 		self.object:set_properties({
 			textures = { "rts_tools:area_display_helper_node_"
-				.. self.display_data.radius }
+				.. self.display_data.boxdef_idf }
 		})
 	end,
 
@@ -55,19 +55,55 @@ minetest.register_entity("rts_tools:area_display", {
 
 rtsp.registered_area_displays = {}
 
--- Registers (or retrieves) an area display with the given radius
-function rtstools.register_area_display(radius)
-	assert(type(radius) == "number")
+local function boxdef_to_identifier(boxdef)
+	if type(boxdef) == "number" then
+		return tostring(boxdef)
+	else
+		local a = math.abs
+		return a(boxdef.min.x) .. "_" .. a(boxdef.min.y) .. "_" .. a(boxdef.min.z) .. "_"
+			.. a(boxdef.max.x) .. "_" .. a(boxdef.max.y) .. "_" .. a(boxdef.max.z)
+	end
+end
 
-	if rtsp.registered_area_displays[radius] then
-		return rtsp.registered_area_displays[radius]
+local function assert_valid_boxdef(boxdef)
+	if type(boxdef) == "number" then
+		return
+	elseif type(boxdef) == "table" then
+		assert(boxdef.min.x <= 0)
+		assert(boxdef.min.y <= 0)
+		assert(boxdef.min.z <= 0)
+		assert(boxdef.max.x >= 0)
+		assert(boxdef.max.y >= 0)
+		assert(boxdef.max.z >= 0)
+		return
+	end
+	assert(false)
+end
+
+-- Registers (or retrieves) an area display with the given radius
+function rtstools.register_area_display(boxdef)
+	assert_valid_boxdef(boxdef)
+
+	local idf = boxdef_to_identifier(boxdef)
+
+	if rtsp.registered_area_displays[idf] then
+		return rtsp.registered_area_displays[idf]
 	end
 
-	local r = radius -- shorter name :)
+	local minp, maxp
+	if type(boxdef) == "table" then
+		minp = boxdef.min
+		maxp = boxdef.max
+	else
+		local r = boxdef -- shorter name :)
+		minp = {x = -r, y = -r, z = -r}
+		maxp = {x = r, y = r, z = r}
+	end
+
 
 	-- Helper node for the area display
 	-- it provides the texture for the area display entity
-	minetest.register_node(":rts_tools:area_display_helper_node_" .. radius, {
+	minetest.register_node(":rts_tools:area_display_helper_node_" .. idf, {
 		tiles = {"protector_display.png"},
 		use_texture_alpha = true,
 		walkable = false,
@@ -76,14 +112,14 @@ function rtstools.register_area_display(radius)
 			type = "fixed",
 			fixed = {
 				-- sides
-				{-(r + .55), -(r + .55), -(r + .55), -(r + .45),  (r + .55),  (r + .55)},
-				{-(r + .55), -(r + .55),  (r + .45),  (r + .55),  (r + .55),  (r + .55)},
-				{ (r + .45), -(r + .55), -(r + .55),  (r + .55),  (r + .55),  (r + .55)},
-				{-(r + .55), -(r + .55), -(r + .55),  (r + .55),  (r + .55), -(r + .45)},
+				{(minp.x + .55), (minp.y + .55), (minp.z + .55), (minp.z + .45), (maxp.y + .55), (maxp.z + .55)},
+				{(minp.x + .55), (minp.y + .55), (maxp.z + .45), (maxp.z + .55), (maxp.y + .55), (maxp.z + .55)},
+				{(maxp.x + .45), (minp.y + .55), (minp.z + .55), (maxp.z + .55), (maxp.y + .55), (maxp.z + .55)},
+				{(minp.x + .55), (minp.y + .55), (minp.z + .55), (maxp.z + .55), (maxp.y + .55), (minp.z + .45)},
 				-- top
-				{-(r + .55),  (r + .45), -(r + .55),  (r + .55),  (r + .55),  (r + .55)},
+				{(minp.x + .55), (maxp.y + .45), (minp.z + .55), (maxp.x + .55), (maxp.y + .55), (maxp.z + .55)},
 				-- bottom
-				{-(r + .55), -(r + .55), -(r + .55),  (r + .55), -(r + .45),  (r + .55)},
+				{(minp.x + .55), (minp.y + .55), (minp.z + .55), (maxp.x + .55), (minp.y + .45), (maxp.z + .55)},
 				-- middle (surrounding the management node)
 				{-.55, -.55, -.55, .55, .55, .55},
 			},
@@ -100,10 +136,10 @@ function rtstools.register_area_display(radius)
 		spawn = function(pos, lifetime)
 			local entity = minetest.add_entity(pos, "rts_tools:area_display")
 			assert(entity) -- ensure we could spawn the entity
-			entity:get_luaentity():set_display_data({ lifetime = lifetime, radius = radius })
+			entity:get_luaentity():set_display_data({ lifetime = lifetime, boxdef_idf = idf })
 			return entity
 		end,
 	}
-	rtsp.registered_area_displays[radius] = ret
+	rtsp.registered_area_displays[idf] = ret
 	return ret
 end
