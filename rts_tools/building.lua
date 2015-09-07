@@ -427,7 +427,7 @@ local building_plans = rtsp.building_plans
 
 local function chat_send_player(player_name_or_nil, msg)
 	if player_name_or_nil then
-		chat_send_player(player_name_or_il, msg)
+		minetest.chat_send_player(player_name_or_nil, msg)
 	end
 end
 
