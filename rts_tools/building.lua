@@ -10,16 +10,21 @@ local rtsb = {}
 -- Local helper functions
 --------------------------------------------------------------
 
-local function get_edges_around_pos(pos, radius)
-	return {
-		x = pos.x - radius,
-		y = pos.y - radius,
-		z = pos.z - radius,
-	}, {
-		x = pos.x + radius,
-		y = pos.y + radius,
-		z = pos.z + radius,
-	}
+local function get_edges_around_pos(pos, boxdef)
+	if type(boxdef) == "number" then
+		return {
+			x = pos.x - boxdef,
+			y = pos.y - boxdef,
+			z = pos.z - boxdef,
+		}, {
+			x = pos.x + boxdef,
+			y = pos.y + boxdef,
+			z = pos.z + boxdef,
+		}
+	else
+		return vector.subtract(pos, boxdef),
+			vector.add(pos, boxdef)
+	end
 end
 
 --------------------------------------------------------------
