@@ -187,6 +187,10 @@ local function new_d_postbl_with_pos(pos, d)
 	return res
 end
 
+local function is_x_z_in_boundaries(x, z, minp, maxp)
+	return minp.x <= x and maxp.x >= x and minp.z <= z and maxp.z >= z
+end
+
 local b_r_search_class = {
 	OUTSIDE = 1,
 	ROOM = 2,
@@ -211,7 +215,9 @@ local function do_room_basic_graph_search(mgmt_pos, bld, room_node_names, minp, 
 		-- print("Column at " .. dump(pos))
 
 		-- 1. Check if x,z combination is outside building area boundaires
-		-- TODO
+		if not is_x_z_in_boundaries(pos.x, pos.z, minp, maxp) then
+			return new_d_postbl_with_pos(pos, b_r_search_class.OUTSIDE), {}
+		end
 
 		-- 2. check current column
 		local column_height = 0
@@ -311,8 +317,11 @@ local function do_room_basic_graph_search(mgmt_pos, bld, room_node_names, minp, 
 			return new_done, {}
 		end
 
-		-- 2. Check if inside building area boundaries
-		-- TODO
+		-- 2. Check if inside building area boundaries (y level too)
+		if not is_x_z_in_boundaries(pos.x, pos.z, minp, maxp)
+				r y < minp.y or y > maxp.y then
+			return new_d_postbl_with_pos(pos, b_r_search_class.OUTSIDE), {}
+		end
 
 		-- 3. Check whether its a wall at all
 		local nd = vmanip:get_node_at(pos)
@@ -378,8 +387,7 @@ local function do_room_basic_graph_search(mgmt_pos, bld, room_node_names, minp, 
 			return new_done, {}
 		end
 
-		-- 5. other columns nodes, if its 2 high, right above the floor,
-		-- if its >= 3 high, one block higher too, to allow for stairs
+		-- 5. Add neighbours as candidates for further wall nodes
 		local add_y = pos.y
 		add_to_d_postable(new_todo, {x = pos.x + 1, y = add_y, z = pos.z}, b_r_search_class.ISITWALL_NOMORE)
 		add_to_d_postable(new_todo, {x = pos.x - 1, y = add_y, z = pos.z}, b_r_search_class.ISITWALL_NOMORE)
