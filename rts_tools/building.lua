@@ -319,7 +319,7 @@ local function do_room_basic_graph_search(mgmt_pos, bld, room_node_names, minp, 
 
 		-- 2. Check if inside building area boundaries (y level too)
 		if not is_x_z_in_boundaries(pos.x, pos.z, minp, maxp)
-				or y < minp.y or y > maxp.y then
+				or pos.y < minp.y or pos.y > maxp.y then
 			return new_d_postbl_with_pos(pos, b_r_search_class.OUTSIDE), {}
 		end
 
