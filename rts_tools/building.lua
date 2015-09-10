@@ -4,13 +4,11 @@
 
 local rtsp = ...
 
-local rtsb = {}
-
 --------------------------------------------------------------
 -- Local helper functions
 --------------------------------------------------------------
 
-local function get_edges_around_pos(pos, boxdef)
+function rtsp.get_edges_around_pos(pos, boxdef)
 	if type(boxdef) == "number" then
 		return {
 			x = pos.x - boxdef,
@@ -62,7 +60,7 @@ local function load_buildings_from_file()
 		loaded_buildings = {}
 		for bid, building in pairs(minetest.deserialize(b)) do
 			local def = rtsp.buildings[building.bld]
-			local minp, maxp = get_edges_around_pos(building.pos, def.boxdef)
+			local minp, maxp = rtsp.get_edges_around_pos(building.pos, def.boxdef)
 			local id = astore:insert_area(minp, maxp, '')
 			assert(id)
 			loaded_buildings[id] = {
@@ -100,7 +98,7 @@ minetest.register_on_shutdown(save_buildings_to_file)
 
 -- returns nil if there is no building
 function rtstools.can_place_building_at_pos(pos, boxdef)
-	local minp, maxp = get_edges_around_pos(pos, boxdef)
+	local minp, maxp = rtsp.get_edges_around_pos(pos, boxdef)
 	for id, area in pairs(astore:get_areas_in_area(minp, maxp, true, false, false)) do
 		return false
 	end
@@ -108,7 +106,7 @@ function rtstools.can_place_building_at_pos(pos, boxdef)
 end
 
 function rtstools.get_buildings_overlapping_area(pos, boxdef)
-	local minp, maxp = get_edges_around_pos(pos, boxdef)
+	local minp, maxp = rtsp.get_edges_around_pos(pos, boxdef)
 	local ret = {}
 	for id in pairs(astore:get_areas_in_area(minp, maxp, true, false, false)) do
 		ret[id] = loaded_buildings[id]
@@ -200,7 +198,7 @@ local b_r_search_class = {
 	NOWALL = 6,
 }
 
-local function do_room_basic_graph_search(mgmt_pos, bld, room_node_names, minp, maxp, vmanip)
+function rtsp.do_room_basic_graph_search(mgmt_pos, bld, room_node_names, minp, maxp, vmanip)
 	local air_cnt = 0
 
 	-- starts the room's graph search with
@@ -448,11 +446,11 @@ function update_building_plans_if_needed(mgmt_pos, bld_def, player_name)
 			.. bld_def.name .. "' for building plan")
 		local plan = {}
 
-		local minp, maxp = get_edges_around_pos(mgmt_pos, bld_def.boxdef)
+		local minp, maxp = rtsp.get_edges_around_pos(mgmt_pos, bld_def.boxdef)
 		local vmanip = minetest.get_voxel_manip(minp, maxp)
 
 		-- first get a list of nodes of the building
-		local building_nodes = do_room_basic_graph_search(mgmt_pos, bld_def,
+		local building_nodes = rtsp.do_room_basic_graph_search(mgmt_pos, bld_def,
 			bld_def.room_node_names, minp, maxp, vmanip)
 		plan.building_nodes = building_nodes
 		-- print(dump(building_nodes))
@@ -509,7 +507,7 @@ minetest.register_abm({
 						-- print("placing '" .. pathel.node.name .. "' at " .. dump(vector.add(pathel.pos, mgmt_pos)))
 
 						-- tell building logic of the added node
-						rtsb.update_building_state(l_bld, l_bld.owner_name)
+						rtsp.update_building_state(l_bld, l_bld.owner_name)
 					end
 				else
 					print("error, reached invalid path element at " .. next_state .. "! possibly end (which shouldnt be reached)?")
@@ -522,74 +520,6 @@ minetest.register_abm({
 		end
 	end,
 })
-
---------------------------------------------------------------
--- Criteria helpers and management
---------------------------------------------------------------
-
--- a list of criteria types, every criterion type gets called differently
-rtstools.crit_type = {
-	nodes = 1, -- gets updated if nodes of the building change
-}
-
-rtstools.crit_helper = {}
-
-function rtstools.crit_helper.make_node_number(nodename, count)
-	return {
-		type = rtstools.crit_type.nodes,
-		is_fulfilled = function(mgmt_pos, bld)
-			local minp, maxp = get_edges_around_pos(mgmt_pos, bld.boxdef)
-			local vmanip = minetest.get_voxel_manip(minp, maxp)
-			local cur_cnt = 0
-			for x = minp.x, maxp.x do
-			for y = minp.y, maxp.y do
-			for z = minp.z, maxp.z do
-				local n = vmanip:get_node_at({x = x, y = y, z = z})
-				if n.name == nodename then
-					cur_cnt = cur_cnt + 1
-				end
-			end
-			end
-			end
-			return (cur_cnt >= count), --(cur_cnt >= count)
-				-- and count .. "/" .. count or
-				cur_cnt .. "/" .. count
-		end,
-		description = "Place " .. count .. " of " .. nodename,
-	}
-end
-
--- door_num: the number of at least two high openings filled
--- room_node_names: { air = {}, door = {}, wall = {}, roof = {}, floor = {} }
--- TODO: doors and walls recognition (esp. doors are hard problem :p)
-function rtstools.crit_helper.make_room_basic(room_node_names, door_min, door_max, air_num)
-	return {
-		type = rtstools.crit_type.nodes,
-		is_fulfilled = function(mgmt_pos, bld)
-			local minp, maxp = get_edges_around_pos(mgmt_pos, bld.boxdef)
-			local vmanip = minetest.get_voxel_manip(minp, maxp)
-			local air_cnt = 0
-			local door_cnt = 0
-
-			local building_nodes, air_cnt = do_room_basic_graph_search(mgmt_pos, bld, room_node_names, minp, maxp, vmanip)
-
-			return (air_cnt >= air_num), -- and (door_cnt >= door_min)
-				--and (door_cnt <= door_max), " air " ..
-				air_cnt .. "/" .. air_num
-				-- .. ", doors " .. door_min .. "/" .. door_max
-		end,
-		description = "Build house with at least " .. air_num .. " blocks of \n air around this node",
-		--"Build a room with at least " .. door_num .. " entrance(s) and at least " .. air_num .. " air",
-	}
-end
-
-local function update_nodes_criteria(mgmt_pos, crit_states, bld)
-	for crit_idx, crit in pairs(bld.built_criteria) do
-		if crit.type == rtstools.crit_type.nodes then
-			crit_states[crit_idx] = { crit.is_fulfilled(mgmt_pos, bld) }
-		end
-	end
-end
 
 local function building_criteria_changed(l_bld, player_name)
 	local meta = minetest.get_meta(l_bld.pos)
@@ -629,8 +559,8 @@ local function building_criteria_changed(l_bld, player_name)
 	meta:set_string("formspec", fspec)
 end
 
-function rtsb.update_building_state(l_bld, player_name)
-	update_nodes_criteria(l_bld.pos, l_bld.crit_states, l_bld.bld)
+function rtsp.update_building_state(l_bld, player_name)
+	rtsp.update_nodes_criteria(l_bld.pos, l_bld.crit_states, l_bld.bld)
 	building_criteria_changed(l_bld, player_name)
 end
 
@@ -638,14 +568,14 @@ minetest.register_on_placenode(function(pos, newnode, placer, oldnode, itemstack
 		pointed_thing)
 	local l_bld = rtstools.get_building_at_pos(pos)
 	if l_bld then
-		rtsb.update_building_state(l_bld, placer:get_player_name())
+		rtsp.update_building_state(l_bld, placer:get_player_name())
 	end
 end)
 
 minetest.register_on_dignode(function(pos, oldnode, digger)
 	local l_bld = rtstools.get_building_at_pos(pos)
 	if l_bld then
-		rtsb.update_building_state(l_bld, digger:get_player_name())
+		rtsp.update_building_state(l_bld, digger:get_player_name())
 	end
 end)
 
@@ -703,7 +633,7 @@ function rtstools.register_building(t_name, def)
 			rts_tools_mgmt = 1,
 			},
 		on_construct = function(pos)
-			local minp, maxp = get_edges_around_pos(pos, def.boxdef)
+			local minp, maxp = rtsp.get_edges_around_pos(pos, def.boxdef)
 			local id = astore:insert_area(minp, maxp, '')
 			assert(id)
 			loaded_buildings[id] = {

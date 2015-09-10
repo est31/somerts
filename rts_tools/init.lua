@@ -14,6 +14,7 @@ local rtsp_dofile = function (name) assert(loadfile(modpath .. name))(rtsp) end
 
 rtsp_dofile("area_display.lua")
 rtsp_dofile("building.lua")
+rtsp_dofile("built_criteria.lua")
 
 --function rtstools.show_
 
